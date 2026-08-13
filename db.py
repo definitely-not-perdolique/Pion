@@ -40,6 +40,20 @@ class ImageboardDB:
         else:
             return DBPost.from_tuple(self, fetchedrow)
 
+    def find_all_posts(self, board_id):
+        self.cur.execute(DBPost.metadata().select_query(where="board_id = ?"), (board_id,))
+
+        fetched = self.cur.fetchall()
+
+        return list(map(lambda x: DBPost.from_tuple(self, x), fetched))
+
+    def find_posts_with_parent(self, board_id, parent_id):
+        self.cur.execute(DBPost.metadata().select_query(where="board_id = ? AND parent_id = ?"), (board_id, parent_id))
+
+        fetched = self.cur.fetchall()
+
+        return list(map(lambda x: DBPost.from_tuple(self, x), fetched))
+
     def insert_object(self, DBObjClass, data, **fields):
         db_obj = DBObjClass(self, 0, data, **fields)
         self.cur.execute(DBObjClass.metadata().insert_query(), db_obj.to_tuple())
@@ -332,6 +346,15 @@ class DBBoard(DBBase):
 
     def find_last_posts(self):
         return self.db.last_posts_in_threads(self.id)
+
+    def find_posts_of_thread(self, thread_id):
+        return self.db.find_posts_with_parent(self.id, thread_id)
+
+    def find_all_threads(self):
+        return self.db.find_posts_with_parent(self.id, 0)
+
+    def find_all_posts(self):
+        return self.db.find_all_posts(self.id)
 
 class DBPost(DBBase):
     fields = [

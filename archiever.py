@@ -27,6 +27,11 @@ def load_posts_after(api, thread, boardname, tnum, pnum):
 
     return len(posts)
 
+def visualise(dbname):
+    with ImageboardDB(dbname) as imdb:
+        board = imdb.find_board(settings.board_to_archive)
+        visualiser.visualise(board, board.find_all_threads())
+
 def updating(dbname):
 
     boardname = settings.board_to_archive
@@ -86,21 +91,24 @@ def updating(dbname):
 def main():
     args = sys.argv
 
-    if len(args) != 3 or args[1] not in ["createdb", "updating"]:
+    if len(args) != 3 or args[1] not in ["createdb", "updating", "visualise"]:
         print(f'''
             Usage: {args[0]} <command> <dbname>
 
-            where <command> in [ createdb, updating ]  
+            where <command> in [ createdb, updating, visualise ]  
         ''')
 
         return
 
     command = args[1]
+    dbpath = args[2]
 
     if command == "createdb":
-        createdb(args[2])
+        createdb(dbpath)
     elif command == "updating":
-        updating(args[2])
+        updating(dbpath)
+    elif command == "visualise":
+        visualise(dbpath)
 
 if __name__ == "__main__":
     main()
