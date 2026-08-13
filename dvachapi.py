@@ -1,6 +1,8 @@
 import requests
 import db
-import time
+import settings
+
+from utilities import active_sleep
 
 def add_item_to_dictionary(dictionary, element):
     ibpostdata = db.ImageboardPostData(element)
@@ -45,24 +47,28 @@ def parse_boards_from_json(json):
 
     return d
 
+def get_cold():
+    time_to_get_cold = settings.cold_delay
+
+    print(f"{time_to_get_cold} seconds to get cold...")
+    active_sleep(time_to_get_cold)
+    print("Retry")
+
 def trying_until_ok(query):
     while True:
         try:
-            r = requests.get(query, timeout = 5)
+            r = requests.get(query)
 
             if not r.ok:
                 if 400 <= r.status_code < 500:
                     raise Exception("Косяк в запросе")
-
-                print("10 seconds to get cold...")
-                time.sleep(10)
-                print("Retry")
+                else:
+                    get_cold()
             else:
                 return r
-        except requests.ReadTimeout:
-            print("10 seconds to get cold...")
-            time.sleep(10)
-            print("Retry")
+
+        except requests.Timeout:
+            get_cold()
             
 
 class DvachApi:

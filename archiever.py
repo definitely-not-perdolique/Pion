@@ -3,6 +3,11 @@ import pathlib
 
 from dvachapi import DvachApi
 from db import ImageboardDB
+import visualiser
+
+from utilities import active_sleep
+
+import settings
 
 def createdb(dbname):
     if pathlib.Path.exists(dbname):
@@ -11,8 +16,21 @@ def createdb(dbname):
     with ImageboardDB(dbname) as imdb:
         imdb.create_db()
 
-def preload(dbname):
-    boardname = "dr"
+def load_posts_after(api, thread, boardname, tnum, pnum):
+    posts = api.get_posts_after(boardname, tnum, pnum)
+
+    if len(posts) > 0:
+        print(f"In thread {tnum} found {len(posts)} new posts (last is {pnum})!")
+
+    for (post, files) in posts.items():
+        thread.add_post(post, files)
+
+    return len(posts)
+
+def updating(dbname):
+
+    boardname = settings.board_to_archive
+    update_delay = settings.update_delay
 
     api_instance = DvachApi()
 
@@ -28,81 +46,51 @@ def preload(dbname):
         else:
             print("Found!")
 
-        print("Loading threads... ")
-        threads = api_instance.get_threads(boardname)
+        while True:
+            print("Loading threads... ")
 
-        threads_to_commit = 10
-        counter = 0
+            all_threads = api_instance.get_threads(boardname)
+            lastposts = {tnum: pnum for tnum, pnum in board.find_last_posts()}
 
-        for (thread, files) in threads.items():
-            if counter >= 10:
-                imdb.commit()
-                counter = 0
+            for (thread, files) in all_threads.items():
+                threadnum = thread.num
 
-            threadnum = thread.num
+                foundthread = board.find_post(threadnum)
 
-            if board.find_post(threadnum) is not None:
-                print(f"Thread {threadnum} found, skip")
-                continue
+                if foundthread is not None:
+                    if thread.lasthit != foundthread.data.lasthit:
+                        print(f"Thread {threadnum} found, loading new posts")
+                        posts_loaded = load_posts_after(api_instance, foundthread, boardname, threadnum, lastposts.get(threadnum, threadnum))
 
-            thread = board.add_thread(thread, files)
+                        print(f"\t{posts_loaded} posts loaded, updating thread in db")
+                        imdb.update_post(foundthread.id, thread)
+                else:
+                    new_thread = board.add_thread(thread, files)
 
-            print(f"Loading posts for thread {threadnum}")
-            posts = api_instance.get_posts(boardname, threadnum)
+                    print(f"New thread {threadnum} found! Loading posts...")
+                    posts = api_instance.get_posts(boardname, threadnum)
 
-            for (post, post_files) in posts.items():
-                thread.add_post(post, post_files)
+                    for (post, post_files) in posts.items():
+                        new_thread.add_post(post, post_files)
 
-            counter += 1
-
-def updating(dbname):
-    preload(dbname)
-
-    boardname = "dr"
-
-    api_instance = DvachApi()
-
-    with ImageboardDB(dbname) as imdb:
-        board = imdb.find_board(boardname)
-            
-        if board is None:
-            print(f"Board {boardname} not found")
-            exit(1)
-
-        l = board.find_last_posts()
-
-        lenl = len(l)
-
-        posts_to_commit = 10
-        counter = 1
-
-        for (tnum, pnum) in l:
-            if counter % 10 == 0:
                 imdb.commit()
 
-            thread = board.find_post(tnum)
+            print("Done!")
+            print()
 
-            posts = api_instance.get_posts_after(boardname, tnum, pnum)
+            print(f"Waiting for {update_delay} seconds...")
+            print()
 
-            if len(posts) > 0:
-                print(f"In thread {tnum} found {len(posts)} new posts (last is {pnum})!")
-
-            for (post, files) in posts.items():
-                thread.add_post(post, files)
-
-            counter += 1
-
-            print(f"[{counter}/{lenl}]")
-
+            active_sleep(update_delay)
 
 def main():
     args = sys.argv
 
-    if len(args) != 3 or args[1] not in ["createdb", "preload", "updating"]:
+    if len(args) != 3 or args[1] not in ["createdb", "updating"]:
         print(f'''
             Usage: {args[0]} <command> <dbname>
 
-            where <command> in [ createdb, preload, updating ]  
+            where <command> in [ createdb, updating ]  
         ''')
 
         return
@@ -111,8 +99,6 @@ def main():
 
     if command == "createdb":
         createdb(args[2])
-    elif command == "preload":
-        preload(args[2])
     elif command == "updating":
         updating(args[2])
 
