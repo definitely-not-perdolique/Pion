@@ -4,6 +4,8 @@ import settings
 
 from utilities import active_sleep
 
+# Я не знаю, что оно делает, писал пьяным.
+# Переделывать не буду, разбираться тоже, работает не трожь
 def add_item_to_dictionary(dictionary, element):
     ibpostdata = db.ImageboardPostData(element)
 
@@ -22,6 +24,12 @@ def parse_posts_from_json(json):
 
     d = {}
 
+    # Сосач бля ебаный криво хуйню возвращает
+    # ПОЧЕМУ-ТО иногда posts завернут в threads, причём 
+    # в этом случае threads это всегда массив с одним элементом
+    # почему нельзя было просто засунуть posts напрямую в корень
+    # жсона - непонятно
+    # абу пидорас ротибаль
     for element in json["threads"]:
         if "posts" in element:
             for post in element["posts"]:
@@ -61,7 +69,7 @@ def trying_until_ok(query):
 
             if not r.ok:
                 if 400 <= r.status_code < 500:
-                    raise Exception("Косяк в запросе")
+                    return None
                 else:
                     get_cold()
             else:
@@ -74,22 +82,26 @@ def trying_until_ok(query):
 class DvachApi:
     endpoint = "https://2ch.su"
 
-    def get_threads(_, boardname):
+    @staticmethod
+    def get_threads(boardname):
         query_path = f"{DvachApi.endpoint}/{boardname}/catalog.json"
         r = trying_until_ok(query_path)
         return parse_posts_from_json(r.json())
 
-    def get_posts(_, boardname, threadnum):
+    @staticmethod
+    def get_posts(boardname, threadnum):
         query_path = f"{DvachApi.endpoint}/{boardname}/res/{threadnum}.json"
         r = trying_until_ok(query_path)
         return parse_posts_from_json(r.json())
 
-    def get_board(_, boardname):
+    @staticmethod
+    def get_board(boardname):
         query_path = f"{DvachApi.endpoint}/api/mobile/v2/boards"
         r = trying_until_ok(query_path)
         return parse_boards_from_json(r.json())[boardname]
 
-    def get_posts_after(_, boardname, threadnum, postnum):
+    @staticmethod
+    def get_posts_after(boardname, threadnum, postnum):
         query_path = f"{DvachApi.endpoint}/api/mobile/v2/after/{boardname}/{threadnum}/{postnum+1}"
         r = trying_until_ok(query_path)
         return parse_after_from_json(r.json())

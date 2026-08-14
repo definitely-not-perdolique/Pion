@@ -1,9 +1,9 @@
 import sqlite3
+from utilities import *
 
 class ImageboardDB:
     def __init__(self, dbname):
         self.dbname = dbname
-        self.con = None
 
     def __enter__(self):
         self.con = sqlite3.connect(self.dbname)
@@ -14,6 +14,46 @@ class ImageboardDB:
         self.commit()
         self.con.close()
 
+    @staticmethod
+    def create_table_query(metadata):
+        return f'''
+        CREATE TABLE {metadata.table_name}(
+            {string_of_typed_fields(metadata.dbfields() + metadata.data_fields())}
+            {"," if len(metadata.constraints) > 0 else ""}
+            {",".join(metadata.constraints)}
+        );
+        '''
+
+    @staticmethod
+    def select_query(where = ""):
+        query = f'''
+        SELECT
+            rowid,
+            {string_of_fields(metadata.dbfields() + metadata.data_fields())}
+        FROM
+            {metadata.table_name}
+        '''
+
+        if(where != ""):
+            query += f'''
+            WHERE
+                {where}
+            '''
+
+        return query
+    
+    @staticmethod
+    def insert_query(metadata):
+        return f'''
+            INSERT INTO {metadata.table_name} VALUES ({values_placeholder(len(metadata.dbfields()) + len(metadata.datafields()))})
+        '''
+
+    @staticmethod
+    def update_query(metadata, set, where):
+        return f'''
+            UPDATE {metadata.table_name} SET {set} WHERE {where}
+        '''
+
     def begin_transaction(self):
         self.cur.execute("BEGIN TRANSACTION")
 
@@ -21,7 +61,7 @@ class ImageboardDB:
         self.con.commit()
 
     def find_board(self, board_id):
-        self.cur.execute(DBBoard.metadata().select_query(where = 'id = ?'), (board_id, ))
+        self.cur.execute(ImageboardDB.select_query(DBBoard.metadata(), where = 'id = ?'), (board_id, ))
 
         fetchedrow = self.cur.fetchone()
 
@@ -31,7 +71,7 @@ class ImageboardDB:
             return DBBoard.from_tuple(self, fetchedrow)
 
     def find_post(self, board_id, postnum):
-        self.cur.execute(DBPost.metadata().select_query(where="board_id = ? AND num = ?"), (board_id, postnum))
+        self.cur.execute(ImageboardDB.select_query(DBPost.metadata(), where="board_id = ? AND num = ?"), (board_id, postnum))
 
         fetchedrow = self.cur.fetchone()
 
@@ -41,14 +81,13 @@ class ImageboardDB:
             return DBPost.from_tuple(self, fetchedrow)
 
     def find_all_posts(self, board_id):
-        self.cur.execute(DBPost.metadata().select_query(where="board_id = ?"), (board_id,))
+        self.cur.execute(ImageboardDB.select_query(DBPost.metadata(), where="board_id = ?"), (board_id,))
 
         fetched = self.cur.fetchall()
-
         return list(map(lambda x: DBPost.from_tuple(self, x), fetched))
 
     def find_posts_with_parent(self, board_id, parent_id):
-        self.cur.execute(DBPost.metadata().select_query(where="board_id = ? AND parent_id = ?"), (board_id, parent_id))
+        self.cur.execute(ImageboardDB.select_query(DBPost.metadata(), where="board_id = ? AND parent_id = ?"), (board_id, parent_id))
 
         fetched = self.cur.fetchall()
 
@@ -56,28 +95,31 @@ class ImageboardDB:
 
     def insert_object(self, DBObjClass, data, **fields):
         db_obj = DBObjClass(self, 0, data, **fields)
-        self.cur.execute(DBObjClass.metadata().insert_query(), db_obj.to_tuple())
+
+        self.cur.execute(ImageboardDB.insert_query(DBObjClass.metadata(), db_obj.to_tuple()))
+
         db_obj.id = self.cur.lastrowid
+
         return db_obj
 
-    def insert_board(self, board_data: ImageboardBoardData):
+    def insert_board(self, board_data):
         return self.insert_object(DBBoard, board_data)
 
-    def insert_post(self, board_id, thread_id, post_data: ImageboardPostData):
+    def insert_post(self, board_id, thread_id, post_data):
         return self.insert_object(DBPost, post_data, parent_id = thread_id, board_id = board_id)
 
     def insert_thread(self, board_id, post):
         return self.insert_post(board_id, 0, post)
 
     def update_post(self, post_id, post_data):
-        updatesetstring = ",".join(f"{f} = ?" for (f, _) in ImageboardPostData.fields())
-        updatequery = DBPost.metadata().update_query(set = updatesetstring, where = "rowid = ?")
+        updatesetstring = update_set_placeholder(ImageboardPostData.fields())
+        updatequery = ImageboardDB.update_query(DBPost.metadata(), set = updatesetstring, where = "rowid = ?")
         self.cur.execute(updatequery, post_data.to_tuple() + (post_id,))
 
-    def insert_file(self, post_id, file_data: ImageboardFileData):
+    def insert_file(self, post_id, file_data):
         return self.insert_object(DBFile, file_data, post_id = post_id)
 
-    def last_posts_in_threads(self, board_id):
+    def find_last_posts_in_threads(self, board_id):
         self.cur.execute('''
             SELECT
                 Threads.num AS ThreadNum,
@@ -103,80 +145,28 @@ class ImageboardDB:
         self.cur.execute(DBPost.metadata().create_table_query())
         self.cur.execute(DBFile.metadata().create_table_query())
         self.cur.execute(DBBoard.metadata().create_table_query())
-
         self.cur.execute("PRAGMA foreign_keys=ON")
 
-# :P
-def values_placeholder(count):
-    return ",".join("?" for i in range(count))
+class ImageboardDataBaseClass:
+    def __init__(self, data, aliases = {}):
+        set_attributes_with_aliases(self, data, aliases)
+        
 
-def update_string(fields):
-    return ",".join(f for f in fields)
+    def to_tuple(self):
+        return tuple(getattr(self, f) for (f,) in self.__class__.fields())
 
-def string_of_fields(fields):
-    return ",".join(f"{x}" for (x, _) in fields)
+    @classmethod
+    def from_tuple(cls, tuple):
+        index_to_field = make_index_to_field_table(cls.fields())
+        data = { index_to_field(i): val for (i, val) in enumerate(tuple) }
+        return cls(data)
 
-def string_of_typed_fields(fields):
-    return ",".join(f"{x} {y}" for (x, y) in fields)
+    @classmethod
+    def fields(cls):
+        return cls._datafields
 
-def set_attributes_with_aliases(self, data, aliases):
-    for (f,_) in self.__class__.fields():
-        name = aliases[f] if f in aliases else f
-
-        setattr(self, f, data.get(name, 0))
-
-def set_fields_from_dictionary(self, fields):
-    for (field, value) in fields.items():
-        setattr(self, field, value)
-
-def data_class_to_tuple(self):
-    tuple = ()
-
-    for (f,_) in self.__class__.fields():
-        tuple += (getattr(self, f),)
-
-    return tuple
-
-def tuple_to_data_class(tuple, Self):
-    index_to_field = Self.index_to_field
-
-    data = {}
-
-    for i in range(len(tuple)):
-        data[index_to_field[i]] = tuple[i]
-
-    return Self(data)
-
-def make_index_to_field_table(fields):
-    result = []
-
-    for (key, _) in fields:
-        result.append(key)
-
-    return result
-
-def db_object_from_tuple(Self, db, tuple):
-    dbfield_indices = make_index_to_field_table(Self.metadata().dbfields())
-    datafield_indices = make_index_to_field_table(Self.metadata().data_fields())
-
-    id = tuple[0]
-
-    offset = 1
-    dbfields = {field: tuple[index + offset] for (index, field) in enumerate(dbfield_indices)}
-
-    offset += len(dbfields)
-    datafields = {field: tuple[index + offset] for index, field in enumerate(datafield_indices)}
-
-    return Self(db, id, Self.metadata().data_class(datafields), **dbfields)
-
-def db_object_to_tuple(self):
-    dbfields = self.__class__.metadata().dbfields()
-    fields = self.__class__.metadata().data_fields()
-
-    return tuple(getattr(self, f[0]) for f in dbfields) + tuple(getattr(self.data, f[0]) for f in fields)
-
-class ImageboardPostData:
-    datafields = [
+class ImageboardPostData(ImageboardDataBaseClass):
+    _datafields = [
         ("comment", "Text"),
         ("timestamp", "Integer"),
         ("email", "Text"),
@@ -191,20 +181,8 @@ class ImageboardPostData:
         ("lasthit", "Integer")
     ]
 
-    def fields():
-        return __class__.datafields
-
-    def __init__(self, data, aliases = {}):
-        set_attributes_with_aliases(self, data, aliases)
-
-    def to_tuple(self):
-        return data_class_to_tuple(self)
-
-    def from_tuple(tuple):
-        return tuple_to_data_class(tuple, __class__)
-
-class ImageboardFileData:
-    datafields = [
+class ImageboardFileData(ImageboardDataBaseClass):
+    _datafields = [
         ("md5", "Text"),
         ("path", "Text"),
         ("displayname", "Text"),
@@ -218,20 +196,8 @@ class ImageboardFileData:
         ("width", "Integer")
     ]
 
-    def fields():
-        return __class__.datafields
-
-    def __init__(self, data, aliases = {}):
-        set_attributes_with_aliases(self, data, aliases)
-
-    def to_tuple(self):
-        return data_class_to_tuple(self)
-
-    def from_tuple(tuple):
-        return tuple_to_data_class(tuple, ImageboardFileData)
-
-class ImageboardBoardData:
-    datafields = [
+class ImageboardBoardData(ImageboardDataBaseClass):
+    _datafields = [
         ("id", "Text"),
         ("name", "Text"),
         ("bump_limit", "Integer"),
@@ -242,18 +208,6 @@ class ImageboardBoardData:
         ("max_pages", "Integer"),
         ("threads_per_page", "Integer")
     ]
-
-    def fields():
-        return __class__.datafields
-
-    def __init__(self, data, aliases = {}):
-        set_attributes_with_aliases(self, data, aliases)
-
-    def to_tuple(self):
-        return data_class_to_tuple(self)
-
-    def from_tuple(tuple):
-        return tuple_to_data_class(tuple, __class__)
 
 class DBMetadata:
     def __init__(self, table_name, data_class, fields = [], constraints = []):
@@ -267,36 +221,6 @@ class DBMetadata:
 
     def data_fields(self):
         return self.data_class.fields()
-
-    def create_table_query(self):
-        return f'''
-        CREATE TABLE {self.table_name}(
-            {string_of_typed_fields(self.fields + self.data_class.fields())}
-            {"," if len(self.constraints) > 0 else ""}
-            {",".join(self.constraints)}
-        );
-        '''
-
-    def select_query(self, where = ""):
-        return f'''
-        SELECT
-            rowid,
-            {string_of_fields(self.fields + self.data_class.fields())}
-        FROM
-            {self.table_name}
-        WHERE
-            {where}
-        '''
-
-    def insert_query(self):
-        return f'''
-            INSERT INTO {self.table_name} VALUES ({values_placeholder(len(self.fields) + len(self.data_class.fields()))})
-        '''
-
-    def update_query(self, set, where):
-        return f'''
-            UPDATE {self.table_name} SET {set} WHERE {where}
-        '''
     
 class DBBase:
     def __init__(self, db, id, data, **fields):
@@ -308,30 +232,43 @@ class DBBase:
             set_fields_from_dictionary(self, fields)
 
     def to_tuple(self):
-        return db_object_to_tuple(self)
+        dbfields = self.__class__.metadata().dbfields()
+        fields = self.__class__.metadata().data_fields()
+    
+        return tuple(getattr(self, f[0]) for f in dbfields) + tuple(getattr(self.data, f[0]) for f in fields)
+        
+    @classmethod
+    def from_tuple(cls, db, tuple):
+        dbfield_indices = make_index_to_field_table(cls.metadata().dbfields())
+        datafield_indices = make_index_to_field_table(cls.metadata().data_fields())
+    
+        id = tuple[0]
+    
+        offset = 1
+        dbfields = {field: tuple[index + offset] for (index, field) in enumerate(dbfield_indices)}
+    
+        offset += len(dbfields)
+        datafields = {field: tuple[index + offset] for index, field in enumerate(datafield_indices)}
+    
+        return cls(db, id, cls.metadata().data_class(datafields), **dbfields)
 
 class DBFile(DBBase):
-    fields = [
+    _fields = [
         ("post_id", "Integer")
     ]
 
-    constraints = [
+    _constraints = [
         "FOREIGN KEY(post_id) REFERENCES Posts(rowid)",
         "UNIQUE(post_id, md5) ON CONFLICT IGNORE"
     ]
 
-    def metadata() -> DBMetadata: 
-        return DBMetadata("Files", ImageboardFileData, __class__.fields, __class__.constraints)
-
-    def from_tuple(db, tuple):
-            return db_object_from_tuple(__class__, db, tuple)
+    @classmethod
+    def metadata(cls) -> DBMetadata: 
+        return DBMetadata("Files", ImageboardFileData, cls._fields, cls._constraints)
 
 class DBBoard(DBBase):
     def metadata() -> DBMetadata:
         return DBMetadata("Boards", ImageboardBoardData)
-
-    def from_tuple(db, tuple):
-            return db_object_from_tuple(__class__, db, tuple)
 
     def add_thread(self, post_data: ImageboardPostData, files:list[ImageboardFileData] = []):
         thread = self.db.insert_thread(self.id, post_data)
@@ -345,7 +282,7 @@ class DBBoard(DBBase):
         return self.db.find_post(self.id, postnum)
 
     def find_last_posts(self):
-        return self.db.last_posts_in_threads(self.id)
+        return self.db.find_last_posts_in_threads(self.id)
 
     def find_posts_of_thread(self, thread_id):
         return self.db.find_posts_with_parent(self.id, thread_id)
@@ -369,9 +306,6 @@ class DBPost(DBBase):
 
     def metadata() -> DBMetadata:
         return DBMetadata("Posts", ImageboardPostData, __class__.fields, __class__.constraints)
-
-    def from_tuple(db, tuple):
-        return db_object_from_tuple(__class__, db, tuple)
 
     def add_post(self, post_data: ImageboardPostData, files:list[ImageboardFileData] = []):
         if self.parent_id != 0:
