@@ -67,7 +67,7 @@ def body():
 def span(**attrs):
     return tag("span", attrs)
 
-async def create_root(threads):
+def create_root(threads):
     print("Creating root file index.html")
     with open(Path.joinpath(path_to_root, "index.html"), "w", encoding="UTF-8") as index:
         lines = []
@@ -216,7 +216,7 @@ def create_css_file():
     with open(Path.joinpath(path_to_res, "post.css"), "w", encoding="utf-8") as cssfile:
         cssfile.write(posts_css())
         
-async def create_thread(thread, posts_dict, files_dict):
+def create_thread(thread, posts_dict, files_dict):
     threadnum = thread.data.num
     print(f"Creating thread {threadnum}")
 
@@ -236,7 +236,7 @@ async def create_thread(thread, posts_dict, files_dict):
     with open(Path.joinpath(path_to_res, f"{threadnum}.html"), "w", encoding="UTF-8") as threadfile:
         threadfile.write(document)
 
-async def create_threads(board, threads):
+def create_threads(board, threads):
 
     all_posts = board.find_all_posts()
     all_files = board.find_all_files()
@@ -255,24 +255,12 @@ async def create_threads(board, threads):
         list = files_dict.setdefault(f.post_id, [])
         list.append(f)
 
-    tasks = []
     for thread in threads:
-        tasks.append(asyncio.create_task(create_thread(thread, posts_dict, files_dict)))
-
-    for t in tasks:
-        await t
-
-async def visualise_async(board, threads):
-
-    tasks = []
-
-    tasks.append(asyncio.create_task(create_root(threads)))
-    tasks.append(asyncio.create_task(create_threads(board, threads)))
-    create_css_file()
-
-    for t in tasks:
-        await t
+        create_thread(thread, posts_dict, files_dict)
 
 def visualise(board, threads):
     Path.mkdir(path_to_res, parents = True, exist_ok = True)
-    asyncio.run(visualise_async(board, threads))
+
+    create_root(threads)
+    create_threads(board, threads)
+    create_css_file()

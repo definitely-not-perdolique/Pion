@@ -19,6 +19,9 @@ def createdb(dbname):
 def load_posts_after(api, thread, boardname, tnum, pnum):
     posts = api.get_posts_after(boardname, tnum, pnum)
 
+    if posts is None:
+        return None
+
     if len(posts) > 0:
         print(f"In thread {tnum} found {len(posts)} new posts (last is {pnum})!")
 

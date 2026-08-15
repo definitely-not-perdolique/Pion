@@ -12,7 +12,7 @@ def values_placeholder(count):
 
 # Возвращает вот такую строку: field1 = ?, field2 = ?, ...
 def update_set_placeholder(fields):
-    return ",".join(f"{f} = ?" for (f,) in fields)
+    return ",".join(f"{f} = ?" for (f, _) in fields)
 
 # Перечисляет все поля через запятую: field1, field2, fields3, ...
 def string_of_fields(fields):

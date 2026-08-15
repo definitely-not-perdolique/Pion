@@ -45,7 +45,7 @@ class ImageboardDB:
     @staticmethod
     def insert_query(metadata):
         return f'''
-            INSERT INTO {metadata.table_name} VALUES ({values_placeholder(len(metadata.dbfields()) + len(metadata.datafields()))})
+            INSERT INTO {metadata.table_name} VALUES ({values_placeholder(len(metadata.dbfields()) + len(metadata.data_fields()))})
         '''
 
     @staticmethod
@@ -101,7 +101,7 @@ class ImageboardDB:
     def insert_object(self, DBObjClass, data, **fields):
         db_obj = DBObjClass(self, 0, data, **fields)
 
-        self.cur.execute(ImageboardDB.insert_query(DBObjClass.metadata(), db_obj.to_tuple()))
+        self.cur.execute(ImageboardDB.insert_query(DBObjClass.metadata()), db_obj.to_tuple())
 
         db_obj.id = self.cur.lastrowid
 
@@ -156,9 +156,8 @@ class ImageboardDataBaseClass:
     def __init__(self, data, aliases = {}):
         set_attributes_with_aliases(self, data, aliases)
         
-
     def to_tuple(self):
-        return tuple(getattr(self, f) for (f,) in self.__class__.fields())
+        return tuple(getattr(self, f) for (f, _) in self.__class__.fields())
 
     @classmethod
     def from_tuple(cls, tuple):
