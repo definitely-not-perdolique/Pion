@@ -32,6 +32,12 @@ def visualise(dbname):
         board = imdb.find_board(settings.board_to_archive)
         visualiser.visualise(board, board.find_all_threads())
 
+def checknone(val):
+    if val is None:
+        print("Something went wrong :c")
+
+    return val is None
+
 def updating(dbname):
 
     boardname = settings.board_to_archive
@@ -55,6 +61,13 @@ def updating(dbname):
             print("Loading threads... ")
 
             all_threads = api_instance.get_threads(boardname)
+
+            # Блять ну, вот, что-то, сука, не так пошло, и запрос вернул None
+            # забиваем пробуем ещё раз через 2 минуты, или сколько там в настройках задано
+            # это вообще тупость какая-то проверять это каждый раз, но я чёт лучше не придумал
+            # и исключения мне ловить не особо хочется
+            if checknone(all_threads): continue
+
             lastposts = {tnum: pnum for tnum, pnum in board.find_last_posts()}
 
             for (thread, files) in all_threads.items():
@@ -67,6 +80,8 @@ def updating(dbname):
                         print(f"Thread {threadnum} found, loading new posts")
                         posts_loaded = load_posts_after(api_instance, foundthread, boardname, threadnum, lastposts.get(threadnum, threadnum))
 
+                        if checknone(posts_loaded): continue
+
                         print(f"\t{posts_loaded} posts loaded, updating thread in db")
                         imdb.update_post(foundthread.id, thread)
                 else:
@@ -74,6 +89,8 @@ def updating(dbname):
 
                     print(f"New thread {threadnum} found! Loading posts...")
                     posts = api_instance.get_posts(boardname, threadnum)
+
+                    if checknone(posts): continue
 
                     for (post, post_files) in posts.items():
                         new_thread.add_post(post, post_files)

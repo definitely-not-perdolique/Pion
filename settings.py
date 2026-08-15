@@ -1,5 +1,7 @@
 ### Settings
 
+api_endpoint = "https://2ch.su/"
+
 # Пока поддерживается только одна доска, и вряд ли будет больше
 board_to_archive = "dr"
 

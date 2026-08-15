@@ -32,4 +32,4 @@ def set_fields_from_dictionary(self, fields):
         setattr(self, field, value)
 
 def make_index_to_field_table(fields):
-    return [key for (key,) in fields]
+    return [key for (key, _) in fields]

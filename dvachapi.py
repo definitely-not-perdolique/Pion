@@ -80,13 +80,17 @@ def trying_until_ok(query):
             
 
 class DvachApi:
-    endpoint = "https://2ch.su"
+    endpoint = settings.api_endpoint
 
     @staticmethod
     def get_threads(boardname):
         query_path = f"{DvachApi.endpoint}/{boardname}/catalog.json"
         r = trying_until_ok(query_path)
-        return parse_posts_from_json(r.json())
+
+        if r is None:
+            return None
+        else:
+            return parse_posts_from_json(r.json())
 
     @staticmethod
     def get_posts(boardname, threadnum):
@@ -98,10 +102,18 @@ class DvachApi:
     def get_board(boardname):
         query_path = f"{DvachApi.endpoint}/api/mobile/v2/boards"
         r = trying_until_ok(query_path)
-        return parse_boards_from_json(r.json())[boardname]
+
+        if r is None:
+                return None
+        else:
+            return parse_boards_from_json(r.json())[boardname]
 
     @staticmethod
     def get_posts_after(boardname, threadnum, postnum):
         query_path = f"{DvachApi.endpoint}/api/mobile/v2/after/{boardname}/{threadnum}/{postnum+1}"
         r = trying_until_ok(query_path)
-        return parse_after_from_json(r.json())
+
+        if r is None:
+            return None
+        else:
+            return parse_after_from_json(r.json())

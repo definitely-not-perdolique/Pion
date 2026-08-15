@@ -25,7 +25,7 @@ class ImageboardDB:
         '''
 
     @staticmethod
-    def select_query(where = ""):
+    def select_query(metadata, where = ""):
         query = f'''
         SELECT
             rowid,
@@ -85,6 +85,11 @@ class ImageboardDB:
 
         fetched = self.cur.fetchall()
         return list(map(lambda x: DBPost.from_tuple(self, x), fetched))
+
+    def find_all_files(self, board_id):
+            self.cur.execute(ImageboardDB.select_query(DBFile.metadata()))
+            fetched = self.cur.fetchall()
+            return list(map(lambda x: DBFile.from_tuple(self, x), fetched))
 
     def find_posts_with_parent(self, board_id, parent_id):
         self.cur.execute(ImageboardDB.select_query(DBPost.metadata(), where="board_id = ? AND parent_id = ?"), (board_id, parent_id))
@@ -292,6 +297,9 @@ class DBBoard(DBBase):
 
     def find_all_posts(self):
         return self.db.find_all_posts(self.id)
+
+    def find_all_files(self):
+        return self.db.find_all_files(self.id)
 
 class DBPost(DBBase):
     fields = [
