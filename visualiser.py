@@ -146,7 +146,7 @@ def posts_css():
         font-family: sans-serif;
         line-height: 1.3;
     }
-    
+
     a {
         color: red;
         text-decoration: none;
@@ -157,10 +157,11 @@ def posts_css():
         border-radius: 0.4em;
         border: 1px solid #d8d8d8;
         width: fit-content;
-        max-width: 1000px;
+        max-width: 60vw;
         padding: 5px 10px;
         color: #333;
         margin: 5px;
+        word-wrap: break-word;
     }
 
     .post_header {
@@ -184,12 +185,7 @@ def posts_css():
 
     .post_body.one_file {
         display: grid;
-        grid-template-columns: 200px 1fr; 
-    }
-
-    .post_body.many_files {
-        display: grid;
-        grid-template-rows: 200px 1fr;
+        grid-template-columns: 15vw 1fr; 
     }
 
     .one_image {
@@ -209,6 +205,7 @@ def posts_css():
     .post_header_element {
         margin-right: 0.4em
     }
+
     '''
 
 def create_css_file():
