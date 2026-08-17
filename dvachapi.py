@@ -77,6 +77,9 @@ def trying_until_ok(query):
 
         except requests.Timeout:
             get_cold()
+
+        except:
+            get_cold()
             
 
 class DvachApi:

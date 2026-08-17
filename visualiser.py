@@ -89,7 +89,7 @@ def post_body_without_files(post_data):
 def generate_image(file_data):
     return div(cls = "post_image") (
         a(href = f"{settings.api_endpoint}/{file_data.path}")(
-            img(src=f"{settings.api_endpoint}/{file_data.thumbnail}")
+            img(loading = "lazy", src = f"{settings.api_endpoint}/{file_data.thumbnail}")
         )
     )
 
