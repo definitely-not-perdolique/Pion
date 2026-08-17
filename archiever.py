@@ -88,9 +88,9 @@ def updating(dbname):
                         if checknone(posts_loaded): continue
 
                         print(f"\t{posts_loaded} posts loaded, updating thread in db")
-                        imdb.update_post(foundthread.id, thread)
+                        new_thread = imdb.update_post(foundthread.id, thread)
 
-                        updated_threads.append(thread)
+                        updated_threads.append(new_thread)
                 else:
                     new_thread = board.add_thread(thread, files)
 

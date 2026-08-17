@@ -121,6 +121,8 @@ class ImageboardDB:
         updatequery = ImageboardDB.update_query(DBPost.metadata(), set = updatesetstring, where = "rowid = ?")
         self.cur.execute(updatequery, post_data.to_tuple() + (post_id,))
 
+        return DBPost(self, self.cur.lastrowid, post_data)
+
     def insert_file(self, post_id, file_data):
         return self.insert_object(DBFile, file_data, post_id = post_id)
 
