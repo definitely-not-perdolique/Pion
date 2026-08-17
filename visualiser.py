@@ -15,9 +15,8 @@ def join_attributes(attrs: dict):
     # Костыль бля ебаный, class нельзя в питоне 
     # использовать, поэтому вместо него cls
     if "cls" in attrs:
-        attrs["class"] = attrs["cls"]
-        attrs.pop("cls")
-
+        attrs["class"] = attrs.pop("cls")
+        
     return " ".join(f"{attr}={quote(val)}" for (attr, val) in attrs.items())
 
 def empty(): pass
