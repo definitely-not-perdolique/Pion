@@ -244,7 +244,7 @@ def create_threads(board, threads):
 
     for p in all_posts:
         if p.parent_id != 0:
-            posts_dict[p.parent_id].append(p)
+            posts_dict.setdefault(p.parent_id, []).append(p)
 
     files_dict = {}
     for f in all_files:

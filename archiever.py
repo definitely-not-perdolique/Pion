@@ -89,8 +89,7 @@ def updating(dbname):
 
                         print(f"\t{posts_loaded} posts loaded, updating thread in db")
                         imdb.update_post(foundthread.id, thread)
-
-
+                        
                         # У найденного треда отличается только data,
                         # поэтому меняем её и у нас считай правильная копия
                         # объекта типа DBPost
