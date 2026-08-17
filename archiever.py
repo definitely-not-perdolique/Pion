@@ -88,9 +88,15 @@ def updating(dbname):
                         if checknone(posts_loaded): continue
 
                         print(f"\t{posts_loaded} posts loaded, updating thread in db")
-                        new_thread = imdb.update_post(foundthread.id, thread)
+                        imdb.update_post(foundthread.id, thread)
 
-                        updated_threads.append(new_thread)
+
+                        # У найденного треда отличается только data,
+                        # поэтому меняем её и у нас считай правильная копия
+                        # объекта типа DBPost
+                        # Немного костыльно, может позже переделаю
+                        foundthread.data = thread
+                        updated_threads.append(foundthread)
                 else:
                     new_thread = board.add_thread(thread, files)
 
