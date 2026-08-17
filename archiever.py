@@ -65,6 +65,8 @@ def updating(dbname):
 
             all_threads = api_instance.get_threads(boardname)
 
+            updated_threads = []
+
             # Блять ну, вот, что-то, сука, не так пошло, и запрос вернул None
             # забиваем пробуем ещё раз через 2 минуты, или сколько там в настройках задано
             # это вообще тупость какая-то проверять это каждый раз, но я чёт лучше не придумал
@@ -87,6 +89,8 @@ def updating(dbname):
 
                         print(f"\t{posts_loaded} posts loaded, updating thread in db")
                         imdb.update_post(foundthread.id, thread)
+
+                        updated_threads.append(thread)
                 else:
                     new_thread = board.add_thread(thread, files)
 
@@ -98,7 +102,12 @@ def updating(dbname):
                     for (post, post_files) in posts.items():
                         new_thread.add_post(post, post_files)
 
+                    updated_threads.append(new_thread)
+
                 imdb.commit()
+
+            if len(updated_threads) > 0:
+                visualiser.visualise(board, updated_threads)
 
             print("Done!")
             print()
